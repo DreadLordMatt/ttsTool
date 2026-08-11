@@ -3,9 +3,15 @@
 # install.sh — set up ttsTool: virtual environment, dependencies, espeak fix.
 #
 # Usage, from the repo folder:
-#     ./install.sh              # install, then offer to add shell aliases
-#     ./install.sh --no-alias   # install only, don't touch your shell config
-#     ./install.sh --force      # rebuild the venv from scratch
+#     ./install.sh                    # install, then offer to add shell aliases
+#     ./install.sh --no-alias         # install only, don't touch your shell config
+#     ./install.sh --force            # rebuild the venv from scratch
+#     ./install.sh --with-models      # also pre-download Kokoro (~360 MB)
+#     ./install.sh --with-models=all  # ...and Chatterbox too (~2.9 GB more)
+#
+# No model weights ship with this repo. They are downloaded from their source
+# repositories on Hugging Face the first time you use them, and cached in
+# ~/.cache/huggingface. --with-models just fetches them now instead of later.
 #
 # Safe to re-run: an existing venv is reused unless you pass --force, and the
 # aliases are only appended once.
@@ -17,12 +23,16 @@ VENV="$REPO/tts-env"
 ALIAS_MARKER="# ttsTool aliases"
 DO_ALIAS=1
 FORCE=0
+GET_MODELS=""
 
 for arg in "$@"; do
     case "$arg" in
-        --no-alias) DO_ALIAS=0 ;;
-        --force)    FORCE=1 ;;
-        -h|--help)  sed -n '3,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --no-alias)         DO_ALIAS=0 ;;
+        --force)            FORCE=1 ;;
+        --with-models)      GET_MODELS="default" ;;
+        --with-models=all)  GET_MODELS="all" ;;
+        --with-models=*)    echo "--with-models takes no value, or '=all'" >&2; exit 2 ;;
+        -h|--help)  sed -n '3,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
     esac
 done
@@ -166,6 +176,45 @@ ok "imports and pronunciation engine working"
     || warn "unit tests did not pass — run ./tts-env/bin/python tests.py to see why"
 
 # ---------------------------------------------------------------------------
+bold "Models"
+# ---------------------------------------------------------------------------
+
+# The source repositories live in engines.py so this script, `speak
+# --list-models`, and the README can't drift apart.
+PYTHONPATH="$REPO" "$VENV/bin/python" - "$GET_MODELS" << 'PYEOF'
+import sys
+
+import engines
+
+want = sys.argv[1] if len(sys.argv) > 1 else ""
+
+print("  No weights ship with this repo — they download from these source")
+print("  repositories on first use, into ~/.cache/huggingface:\n")
+for spec in engines.MODELS.values():
+    state = "cached" if engines.is_downloaded(spec.key) else f"not downloaded yet, {spec.size_hint}"
+    print(f"    {spec.key}  ({spec.license}, {state})")
+    print(f"      {spec.url}")
+    for repo, size, note in engines.COMPANION_DOWNLOADS.get(spec.key, []):
+        print(f"      + https://huggingface.co/{repo}  ({size}, {note})")
+
+if not want:
+    print("\n  Nothing downloaded now. Re-run with --with-models to pre-fetch them.")
+    sys.exit(0)
+
+from huggingface_hub import snapshot_download
+
+targets = ["kokoro"] if want == "default" else list(engines.MODELS)
+for key in targets:
+    spec = engines.MODELS[key]
+    print(f"\n  downloading {spec.repo} ({spec.size_hint})…")
+    snapshot_download(spec.repo)
+    for repo, size, note in engines.COMPANION_DOWNLOADS.get(key, []):
+        print(f"  downloading {repo} ({size})…")
+        snapshot_download(repo)
+print("\n  models cached — first run will not need to download.")
+PYEOF
+
+# ---------------------------------------------------------------------------
 if [ "$DO_ALIAS" -eq 1 ]; then
 bold "Shell aliases"
 # ---------------------------------------------------------------------------
@@ -194,9 +243,14 @@ fi
 # ---------------------------------------------------------------------------
 printf '\n'
 bold "Done."
+if [ -n "$GET_MODELS" ]; then
+    FIRST_RUN_NOTE="models are already cached, so this runs immediately"
+else
+    FIRST_RUN_NOTE="first run downloads Kokoro from Hugging Face, ~390 MB, one time"
+fi
 cat << EOF
 
-  Try it (first run downloads the Kokoro model, ~360 MB, one time):
+  Try it ($FIRST_RUN_NOTE):
 
       ./speak sample.txt
 

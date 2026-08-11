@@ -15,25 +15,54 @@ CHATTERBOX_REPO = "mlx-community/chatterbox-fp16"
 @dataclass(frozen=True)
 class ModelSpec:
     key: str
-    repo: str
+    repo: str               # Hugging Face repo; weights are fetched from here on first use
     preset_voices: bool     # supports Kokoro-style named voices
     uses_ref_audio: bool    # voice comes from a reference clip
     emotion_param: bool     # real emotion control (exaggeration)
     speed_param: bool       # consumes a speed multiplier
     max_chunk_chars: int    # per-generation text cap
     size_hint: str
+    license: str = ""       # license of the repo we actually download
+    upstream: str = ""      # the original project the MLX conversion came from
+
+    @property
+    def url(self):
+        return f"https://huggingface.co/{self.repo}"
 
 
+# No weights ship with this tool. Each model is downloaded from its source
+# repository on first use and cached in ~/.cache/huggingface, shared with any
+# other Hugging Face tooling on the machine.
 MODELS = {
     "kokoro": ModelSpec("kokoro", "mlx-community/Kokoro-82M-bf16",
                         preset_voices=True, uses_ref_audio=False,
                         emotion_param=False, speed_param=True,
-                        max_chunk_chars=600, size_hint="~360 MB"),
+                        max_chunk_chars=600, size_hint="~390 MB",
+                        license="apache-2.0",
+                        upstream="hexgrad/Kokoro-82M"),
     "chatterbox": ModelSpec("chatterbox", CHATTERBOX_REPO,
                             preset_voices=False, uses_ref_audio=True,
                             emotion_param=True, speed_param=False,
-                            max_chunk_chars=300, size_hint="~2.4 GB"),
+                            max_chunk_chars=300, size_hint="~2.6 GB",
+                            license="apache-2.0",
+                            upstream="ResembleAI/chatterbox (MIT)"),
 }
+
+# Pulled in automatically by Chatterbox the first time it loads — listed here
+# so the download is documented rather than a surprise.
+COMPANION_DOWNLOADS = {
+    "chatterbox": [("mlx-community/S3TokenizerV2", "~470 MB", "speech tokenizer")],
+}
+
+
+def model_sources():
+    """Every repo this tool may download, for display in --list-models and docs."""
+    rows = []
+    for spec in MODELS.values():
+        rows.append((spec.key, spec.repo, spec.size_hint, spec.license, spec.upstream))
+        for repo, size, note in COMPANION_DOWNLOADS.get(spec.key, []):
+            rows.append((f"{spec.key} ⤷", repo, size, "", note))
+    return rows
 
 
 def route(*, header_model=None, override=None, any_ref=False, all_have_refs=False,

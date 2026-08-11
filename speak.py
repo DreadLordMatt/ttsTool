@@ -77,16 +77,23 @@ def print_emotions():
 
 
 def print_models():
-    print("Models:\n")
+    print("Models — no weights ship with this tool; each is downloaded from its")
+    print("source repository on first use and cached in ~/.cache/huggingface.\n")
     for spec in engines.MODELS.values():
-        state = "downloaded" if engines.is_downloaded(spec.key) else f"not downloaded ({spec.size_hint})"
+        state = "downloaded" if engines.is_downloaded(spec.key) else f"not downloaded yet ({spec.size_hint})"
         caps = []
         caps.append("54 preset voices" if spec.preset_voices else "voice via reference audio")
         caps.append("real emotion control" if spec.emotion_param else "emotion approximated")
         caps.append("speed control" if spec.speed_param else "no speed control")
-        print(f"  {spec.key:<11} {spec.repo}")
-        print(f"              {', '.join(caps)} — {state}")
-    print("\nAuto-routing picks Kokoro unless reference audio is provided, or emotion")
+        print(f"  {spec.key}")
+        print(f"    source:  {spec.url}")
+        print(f"    license: {spec.license}" + (f" — converted from {spec.upstream}" if spec.upstream else ""))
+        print(f"    {', '.join(caps)}")
+        print(f"    status:  {state}")
+        for repo, size, note in engines.COMPANION_DOWNLOADS.get(spec.key, []):
+            print(f"    also fetches https://huggingface.co/{repo} ({size}, {note})")
+        print()
+    print("Auto-routing picks Kokoro unless reference audio is provided, or emotion")
     print("tags appear in a single-voice script. Override with --model or 'model:' in")
     print("the script header (header wins over --model).")
 

@@ -24,9 +24,10 @@ is safe to re-run — an existing environment is reused unless you pass
 `--force`.
 
 Options: `--no-alias` leaves your shell config alone, `--force` rebuilds the
-environment from scratch.
+environment from scratch, and `--with-models` pre-downloads the model weights
+(see [Models](#models)) instead of fetching them on first use.
 
-Then try it — the first run downloads the Kokoro model (~360 MB, one time):
+Then try it — the first run downloads the Kokoro model (~390 MB, one time):
 
 ```bash
 ./speak sample.txt
@@ -222,13 +223,36 @@ Chatterbox doesn't have a speed control (see below).
 
 ## Models
 
+**No model weights ship with this repo** — it's about 120 KB of Python. Each
+model is downloaded from its own source repository the first time you use it
+and cached in `~/.cache/huggingface`, shared with any other Hugging Face
+tooling on your machine. Nothing is vendored, mirrored, or re-hosted here.
+
+| Model | Source repository | Size | License |
+|---|---|---|---|
+| Kokoro | [mlx-community/Kokoro-82M-bf16](https://huggingface.co/mlx-community/Kokoro-82M-bf16) | ~390 MB | Apache-2.0, converted from [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) |
+| Chatterbox | [mlx-community/chatterbox-fp16](https://huggingface.co/mlx-community/chatterbox-fp16) | ~2.6 GB | Apache-2.0, converted from [ResembleAI/chatterbox](https://huggingface.co/ResembleAI/chatterbox) (MIT) |
+| ↳ its tokenizer | [mlx-community/S3TokenizerV2](https://huggingface.co/mlx-community/S3TokenizerV2) | ~470 MB | pulled in automatically by Chatterbox |
+
+`speak --list-models` prints these sources and whether each is cached yet. To
+fetch them during install instead of on first run:
+
+```bash
+./install.sh --with-models        # Kokoro only
+./install.sh --with-models=all    # Kokoro + Chatterbox
+```
+
+To point at different weights, change the repo ids in
+[engines.py](engines.py) — `MODELS` for Kokoro, `CHATTERBOX_REPO` for
+Chatterbox. Anything `mlx-audio` can load will work.
+
 | | Kokoro (default) | Chatterbox |
 |---|---|---|
 | Voice | 54 named presets (`--voice`) | cloned from a reference clip, or one built-in default voice |
 | Emotion | approximated (pacing only) | real — a genuine model parameter |
 | Speed | `--speed` works | ignored |
 | Speed of generation | ~15× faster than real time | close to real time |
-| First-use download | ~360 MB | ~2.4 GB |
+| First-use download | ~390 MB | ~2.6 GB (+470 MB tokenizer) |
 
 **You don't have to choose.** By default (`--model auto`, the GUI's "Auto")
 the tool looks at your script and picks:
