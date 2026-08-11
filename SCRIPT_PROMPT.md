@@ -152,6 +152,6 @@ category didn't exist five years ago.
 ---
 
 *This document describes the format understood by `ttsTool`'s `speak`
-command on this machine. If the tag list, header fields, or voice names ever
-change, regenerate this file from the tool's own `--list-emotions` /
-`--list-voices` / README rather than hand-editing stale values.*
+command. If the tag list, header fields, or voice names ever change,
+regenerate this file from the tool's own `--list-emotions` / `--list-voices`
+output rather than hand-editing stale values.*

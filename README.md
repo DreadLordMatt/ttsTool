@@ -1,23 +1,59 @@
 # ttsTool — text file in, MP3 out
 
-Local text-to-speech on this Mac. No cloud, no API keys. Uses
-[mlx-audio](https://github.com/Blaizzy/mlx-audio) with two models on Apple
-Silicon: **Kokoro** (fast, 54 preset voices) and **Chatterbox** (real emotion
-control, clones a voice from a short audio clip). The tool picks whichever
-fits your script automatically — see [Models](#models) below.
+Local text-to-speech that runs entirely on your Mac. No cloud, no API keys.
+Uses [mlx-audio](https://github.com/Blaizzy/mlx-audio) with two models on
+Apple Silicon: **Kokoro** (fast, 54 preset voices) and **Chatterbox** (real
+emotion control, clones a voice from a short audio clip). The tool picks
+whichever fits your script automatically — see [Models](#models) below.
 
-**Everything runs from this folder:** `/Users/mbenoit/_devRepoHome/ttsTool`
+Requires an Apple Silicon Mac (M1 or later), Python 3.13, and `ffmpeg`
+(`brew install ffmpeg`) for MP3 output.
+
+---
+
+## Setup (once)
+
+From the repo folder, build the virtual environment — everything installs
+into `tts-env/`, nothing system-wide:
+
+```bash
+python3.13 -m venv tts-env && ./tts-env/bin/pip install mlx-audio misaki && ./tts-env/bin/pip install --only-binary :all: "spacy>=3.8,<3.9" num2words espeakng-loader phonemizer-fork && ./tts-env/bin/pip install gradio pyyaml
+```
+
+Then apply the espeak fix — one file plus one line, needed because misaki
+looks for espeak-ng at a hardcoded Homebrew path (see
+[Quirks](#quirks-this-setup-papers-over) for why):
+
+```bash
+cat > tts-env/lib/python3.13/site-packages/_espeak_fix.py << 'EOF'
+try:
+    import espeakng_loader
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+    if not EspeakWrapper._ESPEAK_LIBRARY:
+        EspeakWrapper.set_library(espeakng_loader.get_library_path())
+        EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
+except Exception:
+    pass
+EOF
+echo "import _espeak_fix" > tts-env/lib/python3.13/site-packages/_espeak_fix.pth
+```
+
+Verify it works (downloads the Kokoro model, ~360 MB, one time):
+
+```bash
+./speak sample.txt
+```
 
 ---
 
 ## The one command you actually want
 
 Set this up once and you can run `speak` (and `speak-gui`) from anywhere,
-forever, with no venv activation. **Already done on this machine** — only
-needed again if you ever recreate `~/.zshrc`:
+forever, with no venv activation. **Run this from the repo folder** — it
+expands to wherever you cloned it:
 
 ```bash
-printf 'alias speak="/Users/mbenoit/_devRepoHome/ttsTool/speak"\nalias speak-gui="/Users/mbenoit/_devRepoHome/ttsTool/speak-gui"\n' >> ~/.zshrc && source ~/.zshrc
+printf 'alias speak="%s/speak"\nalias speak-gui="%s/speak-gui"\n' "$PWD" "$PWD" >> ~/.zshrc && source ~/.zshrc
 ```
 
 After that, from any folder:
@@ -61,33 +97,33 @@ speed slider; press Ctrl-C in the terminal to stop it):
 speak-gui
 ```
 
-> Why this works without activating anything: `speak` is a tiny script in this
-> folder that calls the venv's own Python directly. The venv only needs
+> Why this works without activating anything: `speak` is a tiny script in the
+> repo folder that calls the venv's own Python directly. The venv only needs
 > "activating" if you want to type `python` yourself.
 
 ---
 
 ## Running things manually (if you don't use the alias)
 
-Every command below is copy-pasteable and includes the venv step.
+Run these **from the repo folder**. Each one includes the venv step.
 
 **Convert a text file to MP3:**
 
 ```bash
-cd /Users/mbenoit/_devRepoHome/ttsTool && source tts-env/bin/activate && python speak.py sample.txt
+source tts-env/bin/activate && python speak.py sample.txt
 ```
 
 **List the voices:**
 
 ```bash
-cd /Users/mbenoit/_devRepoHome/ttsTool && source tts-env/bin/activate && python speak.py --list-voices
+source tts-env/bin/activate && python speak.py --list-voices
 ```
 
 **Launch the browser GUI** (file upload, voice dropdown, speed slider —
 it opens http://127.0.0.1:7860 in your browser; press Ctrl-C in the terminal to stop it):
 
 ```bash
-cd /Users/mbenoit/_devRepoHome/ttsTool && source tts-env/bin/activate && python gui.py
+source tts-env/bin/activate && python gui.py
 ```
 
 ---
@@ -312,7 +348,7 @@ use `[pause N]` there for a deliberate beat.
 
 ## What to expect
 
-**Kokoro**, measured on this M3 MacBook Pro with the 512-word `sample.txt`:
+**Kokoro**, measured on an M3 MacBook Pro with the 512-word `sample.txt`:
 **3.4 minutes of audio, generated in 13 seconds, 1.8 MB MP3** — roughly 15×
 faster than real time, so an hour-long document takes about 4 minutes.
 
@@ -344,32 +380,16 @@ brew install ffmpeg
 (If ffmpeg is missing, `speak` still saves your audio as a `.wav` file and
 tells you so — you don't lose the generation.)
 
-**`No module named …` / import errors** — the venv is missing or broken.
-Rebuild it:
+**`No module named …` / import errors** — the venv is missing or broken. Wipe
+it and redo [Setup](#setup-once), from the repo folder:
 
 ```bash
-cd /Users/mbenoit/_devRepoHome/ttsTool && rm -rf tts-env && python3.13 -m venv tts-env && ./tts-env/bin/pip install mlx-audio misaki && ./tts-env/bin/pip install --only-binary :all: "spacy>=3.8,<3.9" num2words espeakng-loader phonemizer-fork && ./tts-env/bin/pip install gradio pyyaml
-```
-
-Then re-create the espeak fix (one file + one line — see "Quirks" below):
-
-```bash
-cd /Users/mbenoit/_devRepoHome/ttsTool && cat > tts-env/lib/python3.13/site-packages/_espeak_fix.py << 'EOF'
-try:
-    import espeakng_loader
-    from phonemizer.backend.espeak.wrapper import EspeakWrapper
-    if not EspeakWrapper._ESPEAK_LIBRARY:
-        EspeakWrapper.set_library(espeakng_loader.get_library_path())
-        EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
-except Exception:
-    pass
-EOF
-echo "import _espeak_fix" > tts-env/lib/python3.13/site-packages/_espeak_fix.pth
+rm -rf tts-env
 ```
 
 **`TypeError: unsupported operand type(s) for +: 'NoneType' and 'str'` during
-generation** — the espeak fix above is missing. Run the "re-create the espeak
-fix" block.
+generation** — the espeak fix is missing. Re-run the second block in
+[Setup](#setup-once).
 
 **`No conditionals available` (Chatterbox)** — you switched `CHATTERBOX_REPO`
 in [engines.py](engines.py) to a checkpoint without a built-in default voice
@@ -396,15 +416,15 @@ the error; the real cause is almost always there. The model cache lives in
 | `engines.py` | Model registry, auto-routing rules, Kokoro/Chatterbox adapters |
 | `gui.py` | Browser GUI (Gradio) |
 | `tests.py` | Unit tests for parsing/routing — no model load, runs in ~1s |
+| `SCRIPT_PROMPT.md` | Paste-into-an-LLM spec so Claude/ChatGPT/Gemini write scripts in this format |
 | `sample.txt` | 512-word test file — run `speak sample.txt` to produce `sample.mp3` |
 | `tts-env/` | Python virtual environment (Python 3.13) — everything is installed here, nothing system-wide |
 
 Generated audio (`*.mp3`, `*.wav`) and `tts-env/` are gitignored — both are
 reproducible, and the venv is 855 MB of platform-specific wheels. On a fresh
-clone, build the venv with the pip commands in
-[If it errors out](#if-it-errors-out) above.
+clone, run [Setup](#setup-once) to build it.
 
-## Quirks this setup papers over (so future-you knows)
+## Quirks this setup papers over
 
 1. **mlx-audio doesn't declare Kokoro's text dependencies.** Plain
    `pip install mlx-audio` can't run Kokoro. The extra installs (misaki, spacy,
@@ -416,3 +436,12 @@ clone, build the venv with the pip commands in
 3. **Chatterbox's `chatterbox-fp16` checkpoint is multilingual v2**, chosen
    because it ships a default voice (no reference clip required). It's a
    noticeably bigger, slower model than Kokoro — see What to expect.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE). The models themselves carry their own licenses
+([Kokoro](https://huggingface.co/hexgrad/Kokoro-82M),
+[Chatterbox](https://huggingface.co/ResembleAI/chatterbox)); this repo only
+contains code that calls them.
