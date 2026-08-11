@@ -13,16 +13,35 @@ Requires an Apple Silicon Mac (M1 or later), Python 3.13, and `ffmpeg`
 
 ## Setup (once)
 
-From the repo folder, build the virtual environment — everything installs
-into `tts-env/`, nothing system-wide:
+```bash
+git clone https://github.com/DreadLordMatt/ttsTool.git && cd ttsTool && ./install.sh
+```
+
+That builds a virtual environment in `tts-env/` (nothing is installed
+system-wide), applies a small fix that Kokoro needs, verifies the result, and
+offers to add `speak` / `speak-gui` shell aliases. It takes a few minutes and
+is safe to re-run — an existing environment is reused unless you pass
+`--force`.
+
+Options: `--no-alias` leaves your shell config alone, `--force` rebuilds the
+environment from scratch.
+
+Then try it — the first run downloads the Kokoro model (~360 MB, one time):
+
+```bash
+./speak sample.txt
+```
+
+<details>
+<summary>Doing it by hand instead</summary>
 
 ```bash
 python3.13 -m venv tts-env && ./tts-env/bin/pip install mlx-audio misaki && ./tts-env/bin/pip install --only-binary :all: "spacy>=3.8,<3.9" num2words espeakng-loader phonemizer-fork && ./tts-env/bin/pip install gradio pyyaml
 ```
 
-Then apply the espeak fix — one file plus one line, needed because misaki
-looks for espeak-ng at a hardcoded Homebrew path (see
-[Quirks](#quirks-this-setup-papers-over) for why):
+Then the espeak fix — misaki looks for espeak-ng at a hardcoded Homebrew path,
+so this points it at the pip-bundled copy instead (see
+[Quirks](#quirks-this-setup-papers-over)):
 
 ```bash
 cat > tts-env/lib/python3.13/site-packages/_espeak_fix.py << 'EOF'
@@ -38,25 +57,23 @@ EOF
 echo "import _espeak_fix" > tts-env/lib/python3.13/site-packages/_espeak_fix.pth
 ```
 
-Verify it works (downloads the Kokoro model, ~360 MB, one time):
+The `--only-binary` flag and the `<3.9` spacy pin both matter: without them
+pip tries to compile blis from source and fails on Python 3.13.
 
-```bash
-./speak sample.txt
-```
+</details>
 
 ---
 
 ## The one command you actually want
 
-Set this up once and you can run `speak` (and `speak-gui`) from anywhere,
-forever, with no venv activation. **Run this from the repo folder** — it
-expands to wherever you cloned it:
+`install.sh` offers to set these up for you. To add them yourself later, run
+this **from the repo folder** — it expands to wherever you cloned it:
 
 ```bash
 printf 'alias speak="%s/speak"\nalias speak-gui="%s/speak-gui"\n' "$PWD" "$PWD" >> ~/.zshrc && source ~/.zshrc
 ```
 
-After that, from any folder:
+Either way, from any folder:
 
 ```bash
 speak myfile.txt
@@ -391,6 +408,13 @@ rm -rf tts-env
 generation** — the espeak fix is missing. Re-run the second block in
 [Setup](#setup-once).
 
+**An error naming a path like `/Users/runner/work/espeakng-loader/...`** — that
+is someone else's build machine, baked into the espeak-ng wheel. espeak-ng
+stores its data directory in a fixed 160-character buffer; if this repo sits
+somewhere deeply nested, the real path overflows and the library silently falls
+back to that compiled-in one. Move the repo closer to your home folder.
+`install.sh` checks for this up front.
+
 **`No conditionals available` (Chatterbox)** — you switched `CHATTERBOX_REPO`
 in [engines.py](engines.py) to a checkpoint without a built-in default voice
 (see Models above). Either provide `--ref-audio`, or switch the constant back.
@@ -409,6 +433,7 @@ the error; the real cause is almost always there. The model cache lives in
 
 | File | What it is |
 |---|---|
+| `install.sh` | One-shot setup: venv, dependencies, espeak fix, aliases |
 | `speak` | The wrapper — makes `speak myfile.txt` work from anywhere |
 | `speak-gui` | Same idea for the GUI — `speak-gui` launches it from anywhere |
 | `speak.py` | The CLI: argument parsing, synthesis, audio output |
