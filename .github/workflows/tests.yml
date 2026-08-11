@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # tests.py covers script parsing and model routing, which are pure
+      # Python. mlx-audio, gradio and the rest are imported lazily inside the
+      # functions that need them, so the suite runs with only pyyaml — which
+      # is what makes this job viable on Linux at all, since mlx is
+      # Apple-Silicon-only and cannot be installed here.
+      - name: Install test dependencies
+        run: pip install pyyaml
+
+      - name: Run unit tests
+        run: python tests.py
+
+  shell:
+    name: shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse shell scripts
+        run: for f in install.sh speak speak-gui; do bash -n "$f" && echo "ok $f"; done
