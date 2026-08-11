@@ -1,0 +1,4 @@
+#!/bin/bash
+# Launch the browser GUI from anywhere, no venv activation needed.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/tts-env/bin/python" "$DIR/gui.py" "$@"

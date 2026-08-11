@@ -1,0 +1,5 @@
+#!/bin/bash
+# Wrapper so `speak myfile.txt` works from anywhere, no venv activation needed.
+# Resolves its own location, so it keeps working if the project folder moves.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/tts-env/bin/python" "$DIR/speak.py" "$@"

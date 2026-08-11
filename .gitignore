@@ -1,0 +1,26 @@
+# Virtual environment — 855 MB of platform-specific wheels, rebuilt from the
+# pip commands in README.md ("If it errors out" → rebuild block).
+tts-env/
+.venv/
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Generated audio. Every run writes an MP3 next to its input, and reference
+# clips recorded in the GUI land here too — all reproducible, none worth
+# versioning as binary blobs.
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.ogg
+
+# Scratch/output folders
+scripts/
+out/
+
+# macOS
+.DS_Store
